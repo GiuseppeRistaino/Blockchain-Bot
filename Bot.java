@@ -1,36 +1,21 @@
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.Arrays;
 import java.util.List;
 
 import org.bitcoinj.core.Address;
-import org.bitcoinj.core.Base58;
 import org.bitcoinj.core.Coin;
-import org.bitcoinj.core.InsufficientMoneyException;
 import org.bitcoinj.core.NetworkParameters;
-import org.bitcoinj.core.PeerGroup;
-import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionConfidence;
-import org.bitcoinj.core.TransactionInput;
 import org.bitcoinj.core.TransactionOutput;
-import org.bitcoinj.crypto.KeyCrypterException;
 import org.bitcoinj.kits.WalletAppKit;
-import org.bitcoinj.params.RegTestParams;
 import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.script.Script;
-import org.bitcoinj.script.ScriptBuilder;
-import org.bitcoinj.script.ScriptChunk;
 import org.bitcoinj.utils.BriefLogFormatter;
 import org.bitcoinj.wallet.Wallet;
 import org.bitcoinj.wallet.listeners.WalletCoinsReceivedEventListener;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.MoreExecutors;
 
 public class Bot {
 
@@ -48,9 +33,6 @@ public class Bot {
         params = TestNet3Params.get();
         filePrefix = "forwarding-service-testnet";
         
-        // Parse the address given as the first parameter.
-        //Indirizzo del bot...inserire l'indirizzo corretto
-        //masterAddress = Address.fromBase58(params, "");
 
         // Start up a basic app using a class that automates some boilerplate.
         kit = new WalletAppKit(params, new File("Bot"), filePrefix);
@@ -88,6 +70,9 @@ public class Bot {
                     @Override
                     public void onSuccess(TransactionConfidence result) {
                         System.out.println("Transazione ricevuta con successo!!!!!!");
+                        /*
+                         * Inoltrare la transazione ricevuta nuovamente al BotMaster
+                         */
                     }
 
                     @Override
@@ -99,6 +84,20 @@ public class Bot {
             }
         });
 
+        List<Address> list = kit.wallet().getWatchedAddresses();
+        if (list.size() < 2) {
+            kit.wallet().addWatchedAddress(kit.wallet().freshReceiveAddress());
+            System.out.println("New address created");
+        }
+
+        System.out.println("You have " + list.size() + " addresses!");
+        for (Address a: list) {
+            System.out.println("Send coins to: " +a.toString());
+        }
+
+        String balance = kit.wallet().getBalance().toFriendlyString();
+        System.out.println(balance);
+        
         Address sendToAddress = kit.wallet().currentReceiveKey().toAddress(params);
         System.out.println("Send coins to: " + sendToAddress);
         System.out.println("Waiting for coins to arrive. Press Ctrl-C to quit.");
