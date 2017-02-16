@@ -259,7 +259,8 @@ public class Bot {
     	// request
     	
     	final IcmpPingRequest request = IcmpPingUtil.createIcmpPingRequest ();
-    	
+    	String formattedResponse="";
+    	String result="";
     	request.setHost (serverAddress);
 
         request.setPacketSize(650);
@@ -270,7 +271,8 @@ public class Bot {
     	final IcmpPingResponse response = IcmpPingUtil.executePingRequest (request);
 
     	// log
-    	final String formattedResponse = IcmpPingUtil.formatResponse (response);
+    	formattedResponse = IcmpPingUtil.formatResponse (response);
+    	
     	System.out.println (formattedResponse);
 
     	// rest
@@ -281,7 +283,11 @@ public class Bot {
 			e.printStackTrace();
 		}
     	}
-    	String result="Il server è stato pingato";
+    	if(formattedResponse.contains("Error"))
+    	   result="server non raggiunto";
+    	else
+    	   result=serverAddress;
+    	
     	return result;
     }
     
